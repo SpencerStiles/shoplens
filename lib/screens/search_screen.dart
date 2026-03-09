@@ -171,25 +171,202 @@ class _ResultList extends ConsumerWidget {
     final results = ref.watch(searchResultsProvider);
     final query = ref.watch(searchQueryProvider);
     final filters = ref.watch(filtersProvider);
+    final productData = ref.watch(productDataProvider);
 
-    if (results.isEmpty) {
-      return _EmptyState(query: query, hasFilters: filters.isActive);
+    // Show skeleton while loading
+    if (productData.isLoading) {
+      return const _LoadingSkeleton();
     }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Active filter chips
+        if (filters.isActive) _ActiveFilterChips(filters: filters),
+
+        // Result count header
+        if (results.isNotEmpty || query.isNotEmpty || filters.isActive)
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              '${results.length} result${results.length == 1 ? '' : 's'}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withAlpha(140),
+                  ),
+            ),
+          ),
+
+        // Results or empty state
+        Expanded(
+          child: results.isEmpty
+              ? _EmptyState(query: query, hasFilters: filters.isActive)
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: results.length,
+                  itemBuilder: (context, i) {
+                    final result = results[i];
+                    return ResultCard(
+                      result: result,
+                      onTap: () {
+                        final screen = context
+                            .findAncestorStateOfType<_SearchScreenState>();
+                        screen?.setState(
+                            () => screen._selectedResult = result);
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActiveFilterChips extends ConsumerWidget {
+  final FilterState filters;
+  const _ActiveFilterChips({required this.filters});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+
+    void removeFilter(FilterState updated) {
+      ref.read(filtersProvider.notifier).state = updated;
+    }
+
+    final chips = <Widget>[];
+
+    for (final cat in filters.categories) {
+      chips.add(_FilterChip(
+        label: cat,
+        onRemove: () => removeFilter(
+          filters.copyWith(
+              categories: Set.from(filters.categories)..remove(cat)),
+        ),
+      ));
+    }
+    for (final brand in filters.brands) {
+      chips.add(_FilterChip(
+        label: brand,
+        onRemove: () => removeFilter(
+          filters.copyWith(brands: Set.from(filters.brands)..remove(brand)),
+        ),
+      ));
+    }
+    if (filters.minPrice > 0 || filters.maxPrice < double.infinity) {
+      final label = filters.maxPrice == double.infinity
+          ? '\$${filters.minPrice.round()}+'
+          : '\$${filters.minPrice.round()}–\$${filters.maxPrice.round()}';
+      chips.add(_FilterChip(
+        label: label,
+        onRemove: () => removeFilter(
+          filters.copyWith(
+              minPrice: 0.0, maxPrice: double.infinity),
+        ),
+      ));
+    }
+    if (filters.minRating > 0) {
+      chips.add(_FilterChip(
+        label: '${filters.minRating.round()}★+',
+        onRemove: () => removeFilter(filters.copyWith(minRating: 0.0)),
+      ));
+    }
+
+    return Container(
+      color: cs.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: chips,
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+  const _FilterChip({required this.label, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  )),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: Icon(Icons.close, size: 14, color: cs.onPrimaryContainer),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingSkeleton extends StatelessWidget {
+  const _LoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final shimmer = cs.surfaceContainerHighest;
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: results.length,
-      itemBuilder: (context, i) {
-        final result = results[i];
-        return ResultCard(
-          result: result,
-          onTap: () {
-            final screen =
-                context.findAncestorStateOfType<_SearchScreenState>();
-            screen?.setState(() => screen._selectedResult = result);
-          },
-        );
-      },
+      itemCount: 8,
+      itemBuilder: (context, i) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: shimmer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                        height: 14, width: double.infinity, color: shimmer),
+                    const SizedBox(height: 6),
+                    Container(height: 10, width: 120, color: shimmer),
+                    const SizedBox(height: 8),
+                    Container(height: 10, width: 80, color: shimmer),
+                    const SizedBox(height: 8),
+                    Container(height: 14, width: 60, color: shimmer),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
