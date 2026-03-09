@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'screens/search_screen.dart';
 
 void main() {
-  runApp(const ShopLensApp());
+  runApp(const ProviderScope(child: ShopLensApp()));
 }
 
 class ShopLensApp extends StatelessWidget {
@@ -19,9 +21,7 @@ class ShopLensApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const Scaffold(
-        body: Center(child: Text('ShopLens')),
-      ),
+      home: const SearchScreen(),
     );
   }
 }
